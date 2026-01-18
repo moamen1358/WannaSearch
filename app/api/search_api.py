@@ -1,172 +1,215 @@
-import uvicorn
-import time
-import logging
+"""Scalable News Search API."""
+
 import os
-from datetime import datetime
-from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel
-from typing import List, Optional
+import time
+import json
+import logging
+from pathlib import Path
+from typing import Optional, List, Dict
+from contextlib import asynccontextmanager
 
-# Import the RSS-based search function
-from app.services.news_search import search_google_news_rss
-# Import user agent manager for search requests
-from app.services.user_agents import UserAgentManager
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+from cachetools import TTLCache
 
-# Ensure logs directory exists
+from app.providers import get_provider, list_providers
+
+# Logging setup
 os.makedirs("logs", exist_ok=True)
-
-# Configure logging with DEBUG level for detailed error tracking
 logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("logs/search.log")
-    ]
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[logging.StreamHandler(), logging.FileHandler("logs/search.log")]
 )
-logger = logging.getLogger("search_api")
+logger = logging.getLogger("api")
 
-# Set third-party loggers to WARNING to reduce noise
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("httpcore").setLevel(logging.WARNING)
-logging.getLogger("urllib3").setLevel(logging.WARNING)
+for lib in ["httpx", "httpcore", "urllib3"]:
+    logging.getLogger(lib).setLevel(logging.WARNING)
 
-# Initialize UserAgentManager for search requests
-ua_manager = UserAgentManager()
 
-# Search request counter
-_search_request_counter = 0
+# =============================================================================
+# Config & Cache
+# =============================================================================
+
+class Config:
+    """App configuration."""
+    cache_ttl: int = 300
+    cache_size: int = 1000
+    rate_limit: int = 100
+    rate_window: int = 60
+
+
+config = Config()
+cache: TTLCache = None
+rate_limits: Dict[str, List[float]] = {}
+
+
+def check_rate_limit(client_ip: str) -> bool:
+    """Check if client is within rate limit."""
+    now = time.time()
+    if client_ip not in rate_limits:
+        rate_limits[client_ip] = []
+
+    # Clean old entries
+    rate_limits[client_ip] = [t for t in rate_limits[client_ip] if now - t < config.rate_window]
+
+    if len(rate_limits[client_ip]) >= config.rate_limit:
+        return False
+
+    rate_limits[client_ip].append(now)
+    return True
+
+
+# =============================================================================
+# App Lifecycle
+# =============================================================================
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global cache
+    logger.info("Starting API...")
+    cache = TTLCache(maxsize=config.cache_size, ttl=config.cache_ttl)
+    providers = list_providers()
+    logger.info(f"Providers: {[p['id'] for p in providers]}")
+    yield
+    logger.info("Shutting down...")
+
 
 app = FastAPI(
-    title="News-Search API",
-    version="2.0.0",
-    description=(
-        "Free, no-API-key news search powered by Google News RSS. "
-        "Supports complex boolean queries with rotating user agents and location spoofing."
-    ),
+    title="WannaSearch API",
+    version="3.0.0",
+    description="Scalable news search with caching and rate limiting",
+    lifespan=lifespan
 )
 
-class NewsItem(BaseModel):
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# =============================================================================
+# Models
+# =============================================================================
+
+class SearchRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=500)
+    provider: str = "google_news_rss"
+    limit: int = Field(default=10, ge=1, le=100)
+
+
+class SearchResult(BaseModel):
     title: str
     link: str
-    published: str
-    source: str
+    published: Optional[str] = None
+    source: Optional[str] = None
+
 
 class SearchResponse(BaseModel):
     query: str
-    results: List[NewsItem]
+    provider: str
+    results: List[SearchResult]
     total: int
-    duration: Optional[float] = None
-    user_agent_used: Optional[str] = None
-    location_used: Optional[str] = None
+    duration: float
+    cached: bool = False
 
-class SearchRequest(BaseModel):
-    query: str
-    limit: int = 10
-    delay: float = 0.0
 
+# =============================================================================
+# Endpoints
+# =============================================================================
 
 @app.get("/health")
-def health_check():
-    """Health check endpoint with system info."""
+async def health():
+    """Health check."""
     return {
         "status": "healthy",
-        "version": "2.0.0",
-        "features": {
-            "user_agents": 55,
-            "locations": 33,
-            "rss_search": True
-        }
+        "version": "3.0.0",
+        "providers": [p["id"] for p in list_providers()],
+        "cache_size": len(cache) if cache else 0,
     }
 
 
+@app.get("/providers")
+async def providers():
+    """List search providers."""
+    return {"providers": list_providers()}
+
+
 @app.post("/search", response_model=SearchResponse)
-def search(req: SearchRequest):
-    """
-    Search for news using Google News RSS via a POST request.
-    Uses rotating user agents and location profiles for anti-detection.
-    """
-    global _search_request_counter
-    _search_request_counter += 1
-    request_id = f"SEARCH_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{_search_request_counter:04d}"
-    
-    start_time = time.time()
-    
-    # Get random profile for this search
-    profile = ua_manager.get_random_profile()
-    location = ua_manager.get_random_location()
-    
-    logger.info(f"""
-╔══════════════════════════════════════════════════════════════════════════╗
-║  🔍 SEARCH REQUEST: {request_id}
-║  📝 Query: {req.query[:50]}{'...' if len(req.query) > 50 else ''}
-║  📊 Limit: {req.limit}
-║  🎭 User-Agent: {profile.browser.upper()}/{profile.version} on {profile.os.upper()}
-║  📍 Location: {location['name']}
-╚══════════════════════════════════════════════════════════════════════════╝""")
+async def search(req: SearchRequest, request: Request):
+    """Search for news."""
+    client_ip = request.client.host if request.client else "unknown"
 
-    try:
-        if req.delay > 0:
-            logger.info(f"    ⏳ Delaying search by {req.delay}s...")
-            time.sleep(req.delay)
+    if not check_rate_limit(client_ip):
+        raise HTTPException(429, "Rate limit exceeded")
 
-        raw = search_google_news_rss(req.query, limit=req.limit)
+    start = time.time()
 
-        duration = time.time() - start_time
-        count = len(raw)
-
-        if count == 0:
-            logger.warning(f"""
-╔══════════════════════════════════════════════════════════════════════════╗
-║  ⚠️ SEARCH RETURNED ZERO RESULTS: {request_id}
-╠══════════════════════════════════════════════════════════════════════════╣
-║  Query:         {req.query[:50]}{'...' if len(req.query) > 50 else ''}
-║  Duration:      {duration:.2f}s
-║  Note:          Could be rate limiting, proxy block, or no matching news
-╚══════════════════════════════════════════════════════════════════════════╝""")
-        else:
-            logger.info(f"""
-╔══════════════════════════════════════════════════════════════════════════╗
-║  ✅ SEARCH SUCCESS: {request_id}
-╠══════════════════════════════════════════════════════════════════════════╣
-║  Query:         {req.query[:50]}{'...' if len(req.query) > 50 else ''}
-║  Results:       {count} items found
-║  Duration:      {duration:.2f}s
-╚══════════════════════════════════════════════════════════════════════════╝""")
-
-        items = [
-            NewsItem(
-                title=item["title"],
-                link=item["link"],
-                published=item["published"],
-                source=item["source"]
-            )
-            for item in raw
-        ]
-
+    # Check cache
+    cache_key = f"{req.provider}:{req.query}:{req.limit}"
+    if cache and cache_key in cache:
+        data = cache[cache_key]
         return SearchResponse(
             query=req.query,
-            results=items,
-            total=len(items),
-            duration=duration,
-            user_agent_used=f"{profile.browser}/{profile.version}",
-            location_used=location['name']
+            provider=req.provider,
+            results=data["results"],
+            total=data["total"],
+            duration=time.time() - start,
+            cached=True,
         )
-    except Exception as e:
-        duration = time.time() - start_time
-        logger.exception(f"""
-╔══════════════════════════════════════════════════════════════════════════╗
-║  💥 SEARCH API ERROR: {request_id}
-╠══════════════════════════════════════════════════════════════════════════╣
-║  Query:         {req.query[:50]}{'...' if len(req.query) > 50 else ''}
-║  Error:         {str(e)[:50]}{'...' if len(str(e)) > 50 else ''}
-║  Error Type:    {type(e).__name__}
-║  Duration:      {duration:.2f}s
-╚══════════════════════════════════════════════════════════════════════════╝""")
-        raise HTTPException(status_code=500, detail=str(e))
 
+    # Get provider
+    provider = get_provider(req.provider)
+    if not provider:
+        raise HTTPException(400, f"Unknown provider: {req.provider}")
+
+    logger.info(f"Search: '{req.query[:50]}' via {req.provider}")
+
+    # Execute search
+    try:
+        result = await provider.search_async(req.query, limit=req.limit)
+    except Exception as e:
+        logger.error(f"Search error: {e}")
+        raise HTTPException(500, str(e))
+
+    # Convert results
+    items = [
+        SearchResult(title=r.title, link=r.link, published=r.published, source=r.source)
+        for r in result.results
+    ]
+
+    # Cache
+    if cache is not None:
+        cache[cache_key] = {"results": items, "total": len(items)}
+
+    duration = time.time() - start
+    logger.info(f"Found {len(items)} results in {duration:.2f}s")
+
+    return SearchResponse(
+        query=req.query,
+        provider=req.provider,
+        results=items,
+        total=len(items),
+        duration=duration,
+        cached=False,
+    )
+
+
+@app.delete("/cache")
+async def clear_cache():
+    """Clear search cache."""
+    if cache:
+        cache.clear()
+    return {"status": "ok"}
+
+
+# =============================================================================
+# Main
+# =============================================================================
 
 if __name__ == "__main__":
-    # Run with: uvicorn app.api.search_api:app --host 0.0.0.0 --port 8001 --reload
+    import uvicorn
     uvicorn.run("app.api.search_api:app", host="0.0.0.0", port=8001, reload=True)
