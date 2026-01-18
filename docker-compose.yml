@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  search-api:
+    build: .
+    image: moamen1358/news-search:latest
+    container_name: search-api
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+    restart: always
