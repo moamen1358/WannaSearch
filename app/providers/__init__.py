@@ -32,7 +32,12 @@ def list_providers() -> List[Dict[str, str]]:
 def discover_providers() -> None:
     """Import and register all providers."""
     from app.providers.google_news import GoogleNewsProvider
+    from app.providers.bing_news import BingNewsProvider
+    from app.providers.newsapi import NewsAPIProvider
+
     register(GoogleNewsProvider())
+    register(BingNewsProvider())
+    register(NewsAPIProvider())
 
 
 # Auto-discover on import
