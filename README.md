@@ -46,7 +46,12 @@ website_scraper/
 ├── app/
 │   ├── services/
 │   │   ├── scraper.py        # Core scraper with anti-detection suite
-│   │   └── news_search.py    # Google News RSS searcher
+│   │   └── news_search.py    # News search with multiple providers
+│   ├── providers/            # News provider implementations
+│   │   ├── base.py           # Base provider interface
+│   │   ├── google_news_rss.py
+│   │   ├── bing_news_rss.py
+│   │   └── newsapi.py
 │   └── api/
 │       ├── scraper_api.py    # FastAPI endpoint for scraping
 │       └── search_api.py     # FastAPI endpoint for news search
@@ -54,6 +59,7 @@ website_scraper/
 │   ├── config.json           # Your configuration (gitignored)
 │   ├── config.json.example   # Example configuration
 │   └── proxies.txt           # Your proxy list (gitignored)
+├── main.py                   # CLI entry point
 ├── logs/                     # Log files (gitignored)
 ├── screenshots/              # Failure screenshots (gitignored)
 ├── requirements.txt
@@ -132,6 +138,79 @@ docker-compose up -d
 |---------|-----|-------------|
 | Scraper API | `http://localhost:8000` | Article extraction |
 | Search API | `http://localhost:8001` | Google News search |
+
+## CLI Usage
+
+The CLI provides a simple way to search news from multiple providers directly from the terminal.
+
+### List Available Providers
+```bash
+python main.py --list-providers
+```
+
+Output:
+```
+  google_news_rss: Search news via Google News RSS feeds
+  bing_news_rss: Search news via Bing News RSS feeds
+  newsapi: Search news via NewsAPI.org (100 req/day free)
+```
+
+### Search News
+
+```bash
+# Basic search (uses default provider: google_news_rss)
+python main.py -q "Tesla"
+
+# Specify provider and limit results
+python main.py -q "Apple" -p newsapi -l 5
+
+# Search with Bing News
+python main.py -q "Microsoft" -p bing_news_rss -l 3
+```
+
+### CLI Options
+
+| Option | Description |
+|--------|-------------|
+| `-q, --query` | Search query (required) |
+| `-p, --provider` | News provider: `google_news_rss`, `bing_news_rss`, `newsapi` |
+| `-l, --limit` | Maximum number of results (default: 10) |
+| `--list-providers` | List all available providers |
+
+### News Providers
+
+| Provider | Description | API Key Required |
+|----------|-------------|------------------|
+| `google_news_rss` | Google News RSS feeds | No |
+| `bing_news_rss` | Bing News RSS feeds | No |
+| `newsapi` | NewsAPI.org (100 req/day free tier) | Yes |
+
+### NewsAPI Configuration
+
+To use the NewsAPI provider, add your API key to `config/config.json`:
+
+```json
+{
+    "newsapi": {
+        "api_key": "your_api_key_here"
+    }
+}
+```
+
+Get a free API key at: https://newsapi.org/register
+
+### Example Output
+
+```json
+[
+  {
+    "title": "Tesla Announces New Model",
+    "link": "https://example.com/article",
+    "published": "2026-01-18T10:30:00Z",
+    "source": "TechNews"
+  }
+]
+```
 
 ## API Usage
 
