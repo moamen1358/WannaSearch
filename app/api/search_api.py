@@ -1,6 +1,5 @@
 """Scalable News Search API."""
 
-import os
 import time
 import logging
 from typing import Optional, List, Dict
@@ -13,17 +12,8 @@ from cachetools import TTLCache
 
 from app.providers import get_provider, list_providers
 
-# Logging setup
-os.makedirs("logs", exist_ok=True)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[logging.StreamHandler(), logging.FileHandler("logs/search.log")]
-)
+# Logger (configured by providers module on import)
 logger = logging.getLogger("api")
-
-for lib in ["httpx", "httpcore", "urllib3"]:
-    logging.getLogger(lib).setLevel(logging.WARNING)
 
 
 # =============================================================================
@@ -94,7 +84,8 @@ app.add_middleware(
 # =============================================================================
 
 class SearchRequest(BaseModel):
-    query: str = Field(..., min_length=1, max_length=500)
+    query: str = Field(default="", max_length=500)
+    company_name: Optional[str] = Field(default=None, max_length=200)
     provider: str = "google_news_rss"
     limit: int = Field(default=10, ge=1, le=100)
 
@@ -108,6 +99,7 @@ class SearchResult(BaseModel):
 
 class SearchResponse(BaseModel):
     query: str
+    company_name: Optional[str] = None
     provider: str
     results: List[SearchResult]
     total: int
@@ -141,17 +133,22 @@ async def search(req: SearchRequest, request: Request):
     """Search for news."""
     client_ip = request.client.host if request.client else "unknown"
 
+    # Validate: either query or company_name must be provided
+    if not req.query and not req.company_name:
+        raise HTTPException(400, "Either 'query' or 'company_name' must be provided")
+
     if not check_rate_limit(client_ip):
         raise HTTPException(429, "Rate limit exceeded")
 
     start = time.time()
 
     # Check cache
-    cache_key = f"{req.provider}:{req.query}:{req.limit}"
+    cache_key = f"{req.provider}:{req.query}:{req.company_name}:{req.limit}"
     if cache and cache_key in cache:
         data = cache[cache_key]
         return SearchResponse(
-            query=req.query,
+            query=data.get("query", req.query),
+            company_name=req.company_name,
             provider=req.provider,
             results=data["results"],
             total=data["total"],
@@ -164,11 +161,11 @@ async def search(req: SearchRequest, request: Request):
     if not provider:
         raise HTTPException(400, f"Unknown provider: {req.provider}")
 
-    logger.info(f"Search: '{req.query[:50]}' via {req.provider}")
+    logger.info(f"Search: company='{req.company_name}', query='{req.query[:50] if req.query else ''}' via {req.provider}")
 
     # Execute search
     try:
-        result = await provider.search_async(req.query, limit=req.limit)
+        result = await provider.search_async(req.query, limit=req.limit, company_name=req.company_name)
     except Exception as e:
         logger.error(f"Search error: {e}")
         raise HTTPException(500, str(e))
@@ -181,13 +178,14 @@ async def search(req: SearchRequest, request: Request):
 
     # Cache
     if cache is not None:
-        cache[cache_key] = {"results": items, "total": len(items)}
+        cache[cache_key] = {"results": items, "total": len(items), "query": result.query}
 
     duration = time.time() - start
     logger.info(f"Found {len(items)} results in {duration:.2f}s")
 
     return SearchResponse(
-        query=req.query,
+        query=result.query,
+        company_name=req.company_name,
         provider=req.provider,
         results=items,
         total=len(items),

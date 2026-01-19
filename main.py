@@ -2,14 +2,18 @@
 
 import argparse
 import json
+import logging
 import sys
 
 from app.providers import get_provider, list_providers
 
+logger = logging.getLogger("cli")
+
 
 def main():
     parser = argparse.ArgumentParser(description="WannaSearch - News Search CLI")
-    parser.add_argument("-q", "--query", help="Search query")
+    parser.add_argument("-q", "--query", help="Search query (optional if -c is provided)")
+    parser.add_argument("-c", "--company", help="Company name for security news search")
     parser.add_argument("-l", "--limit", type=int, default=10, help="Max results (default: 10)")
     parser.add_argument("-p", "--provider", default="google_news_rss", help="Provider ID")
     parser.add_argument("--list-providers", action="store_true", help="List providers")
@@ -21,15 +25,20 @@ def main():
             print(f"  {p['id']}: {p['description']}")
         return
 
-    if not args.query:
-        parser.error("-q/--query is required")
+    # Either query or company must be provided
+    if not args.query and not args.company:
+        parser.error("-q/--query or -c/--company is required")
 
     provider = get_provider(args.provider)
     if not provider:
         print(f"Error: Unknown provider '{args.provider}'", file=sys.stderr)
         sys.exit(1)
 
-    result = provider.search(args.query, limit=args.limit)
+    # Use empty query if only company is provided
+    query = args.query or ""
+
+    logger.info(f"CLI search: company='{args.company}', query='{query}', limit={args.limit}")
+    result = provider.search(query, limit=args.limit, company_name=args.company)
 
     output = [
         {"title": r.title, "link": r.link, "published": r.published, "source": r.source}

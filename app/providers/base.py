@@ -22,6 +22,7 @@ class SearchResponse:
     results: List[SearchResult]
     total: int
     duration: float = 0.0
+    company_name: Optional[str] = None
 
 
 class SearchProvider(ABC):
@@ -32,11 +33,11 @@ class SearchProvider(ABC):
     PROVIDER_DESCRIPTION: str = ""
 
     @abstractmethod
-    def search(self, query: str, limit: int = 10) -> SearchResponse:
+    def search(self, query: str, limit: int = 10, company_name: Optional[str] = None) -> SearchResponse:
         """Execute a search query."""
         pass
 
     @abstractmethod
-    async def search_async(self, query: str, limit: int = 10) -> SearchResponse:
+    async def search_async(self, query: str, limit: int = 10, company_name: Optional[str] = None) -> SearchResponse:
         """Execute an async search query."""
         pass
