@@ -46,7 +46,7 @@ python main.py -c "Company" -q "search terms" -t 365 -l 10
 
 # Examples:
 python main.py -c "Microsoft" -q "data breach" -t 90 -l 5
-python main.py -c "Tactful" -q "AI customer service" -t 365 -l 10
+python main.py -c "Tactful" --country "Egypt" -q "AI customer service" -t 365 -l 10
 python main.py -q "cybersecurity news" -t 30 -l 10
 ```
 
@@ -55,11 +55,14 @@ python main.py -q "cybersecurity news" -t 30 -l 10
 | Option | Description |
 |--------|-------------|
 | `-c, --company` | Company name to search for |
+| `--country` | Company location/country |
 | `-q, --query` | Search query/keywords |
 | `-t, --time` | Time range in days (e.g., 365 for last year) |
 | `-l, --limit` | Max results (default: 10) |
+| `--serve` | Start the API server |
+| `--port` | API server port (default: 8001) |
 
-**Note:** At least one of `-c` (company) or `-q` (query) must be provided.
+**Note:** At least one of `-c` (company) or `-q` (query) must be provided for search operations.
 
 ### Output
 
@@ -115,6 +118,7 @@ curl -X POST http://localhost:8001/search \
   -H "Content-Type: application/json" \
   -d '{
     "company_name": "Microsoft",
+    "country": "USA",
     "query": "data breach",
     "time_days": 365,
     "limit": 10
@@ -126,6 +130,7 @@ curl -X POST http://localhost:8001/search \
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `company_name` | string | No | Company name to search |
+| `country` | string | No | Company location/country |
 | `query` | string | No | Search keywords |
 | `time_days` | int | No | Time range in days (1-3650) |
 | `limit` | int | No | Max results (1-100, default: 10) |
@@ -148,10 +153,13 @@ curl -X POST http://localhost:8001/search \
 ## Running the API Locally
 
 ```bash
-# Start the API server
-uvicorn app.api.search_api:app --host 0.0.0.0 --port 8001
+# Start the API server using CLI
+python main.py --serve
 
-# Or with auto-reload for development
+# Start on a custom port
+python main.py --serve --port 9000
+
+# Or use uvicorn directly with auto-reload for development
 uvicorn app.api.search_api:app --host 0.0.0.0 --port 8001 --reload
 ```
 
@@ -160,10 +168,18 @@ uvicorn app.api.search_api:app --host 0.0.0.0 --port 8001 --reload
 Test your setup:
 
 ```bash
-# Test CLI
+# Test CLI search
 python main.py -c "Test" -q "news" -t 30 -l 3
 
-# Test API (if running)
+# Test serve mode
+python main.py --serve
+# Then in another terminal:
+curl http://localhost:8001/health
+
+# Test with custom port
+python main.py --serve --port 9000
+
+# Test API search (if server is running)
 curl -X POST http://localhost:8001/search \
   -H "Content-Type: application/json" \
   -d '{"company_name": "Test", "query": "news", "time_days": 30, "limit": 3}'

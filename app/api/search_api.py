@@ -86,6 +86,7 @@ app.add_middleware(
 class SearchRequest(BaseModel):
     query: str = Field(default="", max_length=500)
     company_name: Optional[str] = Field(default=None, max_length=200)
+    country: Optional[str] = Field(default=None, max_length=100, description="Company location/country")
     time_days: Optional[int] = Field(default=None, ge=1, le=3650, description="Time range in days")
     provider: str = "google_news_rss"
     limit: int = Field(default=10, ge=1, le=100)
@@ -144,7 +145,7 @@ async def search(req: SearchRequest, request: Request):
     start = time.time()
 
     # Check cache
-    cache_key = f"{req.provider}:{req.query}:{req.company_name}:{req.time_days}:{req.limit}"
+    cache_key = f"{req.provider}:{req.query}:{req.company_name}:{req.country}:{req.time_days}:{req.limit}"
     if cache and cache_key in cache:
         data = cache[cache_key]
         return SearchResponse(
@@ -162,11 +163,11 @@ async def search(req: SearchRequest, request: Request):
     if not provider:
         raise HTTPException(400, f"Unknown provider: {req.provider}")
 
-    logger.info(f"Search: company='{req.company_name}', query='{req.query[:50] if req.query else ''}', time_days={req.time_days} via {req.provider}")
+    logger.info(f"Search: company='{req.company_name}', country='{req.country}', query='{req.query[:50] if req.query else ''}', time_days={req.time_days} via {req.provider}")
 
     # Execute search
     try:
-        result = await provider.search_async(req.query, limit=req.limit, company_name=req.company_name, time_days=req.time_days)
+        result = await provider.search_async(req.query, limit=req.limit, company_name=req.company_name, time_days=req.time_days, country=req.country)
     except Exception as e:
         logger.error(f"Search error: {e}")
         raise HTTPException(500, str(e))

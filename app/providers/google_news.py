@@ -48,26 +48,27 @@ class GoogleNewsProvider(SearchProvider):
         self,
         query: str,
         company_name: Optional[str] = None,
-        time_days: Optional[int] = None
+        time_days: Optional[int] = None,
+        country: Optional[str] = None
     ) -> str:
-        """Build the search query with company name, query, and time filter."""
-        parts = []
+        """Build the search query with company name, query, location, and time filter.
 
-        # Add company name if provided
-        if company_name:
-            parts.append(company_name)
-
-        # Add query if provided
-        if query:
-            parts.append(query)
-
-        # Build the final query
-        if len(parts) > 1:
-            search_query = " AND ".join(parts)
-        elif parts:
-            search_query = parts[0]
+        Format: {company_name} AND ({query}) location:{country} after:{date}
+        """
+        # Build the main query
+        if company_name and query:
+            # Wrap query in parentheses when combining with company name
+            search_query = f"{company_name} AND ({query})"
+        elif company_name:
+            search_query = company_name
+        elif query:
+            search_query = query
         else:
             search_query = ""
+
+        # Add location filter if provided
+        if country:
+            search_query = f"{search_query} location:{country}"
 
         # Add time filter if provided
         if time_days is not None:
@@ -102,13 +103,14 @@ class GoogleNewsProvider(SearchProvider):
         query: str,
         limit: int = 10,
         company_name: Optional[str] = None,
-        time_days: Optional[int] = None
+        time_days: Optional[int] = None,
+        country: Optional[str] = None
     ) -> SearchResponse:
         """Execute synchronous search."""
         import requests
 
         start = time.time()
-        search_query = self._build_query(query, company_name, time_days)
+        search_query = self._build_query(query, company_name, time_days, country)
         url = self._build_url(search_query)
         headers = {"User-Agent": random.choice(self.user_agents)}
 
@@ -138,11 +140,12 @@ class GoogleNewsProvider(SearchProvider):
         query: str,
         limit: int = 10,
         company_name: Optional[str] = None,
-        time_days: Optional[int] = None
+        time_days: Optional[int] = None,
+        country: Optional[str] = None
     ) -> SearchResponse:
         """Execute async search."""
         start = time.time()
-        search_query = self._build_query(query, company_name, time_days)
+        search_query = self._build_query(query, company_name, time_days, country)
         url = self._build_url(search_query)
         headers = {"User-Agent": random.choice(self.user_agents)}
 
