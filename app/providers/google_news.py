@@ -23,12 +23,6 @@ DEFAULT_USER_AGENTS = [
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
 ]
 
-DEFAULT_SECURITY_KEYWORDS = [
-    "breach", "threat", "attack", "vulnerability", "exploit",
-    "hack", "malware", "ransomware", "phishing", "incident",
-    "leak", "compromise", "cyber"
-]
-
 
 class GoogleNewsProvider(SearchProvider):
     """Search provider for Google News RSS feeds."""
@@ -48,7 +42,6 @@ class GoogleNewsProvider(SearchProvider):
         self.user_agents = user_agents or DEFAULT_USER_AGENTS
         self.proxies = proxies or []
         self.search_config = search_config or {}
-        self.security_keywords = self.search_config.get("security_keywords", DEFAULT_SECURITY_KEYWORDS)
         self.time_range_years = self.search_config.get("time_range_years", 1.5)
 
     def _build_query(
@@ -64,13 +57,9 @@ class GoogleNewsProvider(SearchProvider):
         if company_name:
             parts.append(company_name)
 
-        # Add custom query or default to security keywords
+        # Add query if provided
         if query:
             parts.append(query)
-        elif company_name:
-            # Only use security keywords if company is provided but no custom query
-            keywords_part = " OR ".join(f'"{kw}"' for kw in self.security_keywords)
-            parts.append(f"({keywords_part})")
 
         # Build the final query
         if len(parts) > 1:
@@ -78,18 +67,11 @@ class GoogleNewsProvider(SearchProvider):
         elif parts:
             search_query = parts[0]
         else:
-            search_query = query
+            search_query = ""
 
-        # Add time filter
+        # Add time filter if provided
         if time_days is not None:
             after_date = datetime.now() - timedelta(days=time_days)
-        elif company_name:
-            # Use default time range for company searches
-            after_date = datetime.now() - timedelta(days=int(self.time_range_years * 365))
-        else:
-            after_date = None
-
-        if after_date:
             date_str = after_date.strftime("%Y-%m-%d")
             search_query = f"{search_query} after:{date_str}"
 
@@ -130,7 +112,8 @@ class GoogleNewsProvider(SearchProvider):
         url = self._build_url(search_query)
         headers = {"User-Agent": random.choice(self.user_agents)}
 
-        logger.info(f"Search request: company='{company_name}', query='{search_query[:100]}', time_days={time_days}")
+        logger.info(f"Search request: company='{company_name}', query='{search_query}', time_days={time_days}")
+        logger.info(f"Search URL: {url}")
 
         try:
             resp = requests.get(url, headers=headers, timeout=30)
@@ -147,6 +130,7 @@ class GoogleNewsProvider(SearchProvider):
             total=len(results),
             duration=time.time() - start,
             company_name=company_name,
+            url=url,
         )
 
     async def search_async(
@@ -162,7 +146,8 @@ class GoogleNewsProvider(SearchProvider):
         url = self._build_url(search_query)
         headers = {"User-Agent": random.choice(self.user_agents)}
 
-        logger.info(f"Async search request: company='{company_name}', query='{search_query[:100]}', time_days={time_days}")
+        logger.info(f"Async search request: company='{company_name}', query='{search_query}', time_days={time_days}")
+        logger.info(f"Search URL: {url}")
 
         try:
             async with httpx.AsyncClient(timeout=30) as client:
@@ -180,4 +165,5 @@ class GoogleNewsProvider(SearchProvider):
             total=len(results),
             duration=time.time() - start,
             company_name=company_name,
+            url=url,
         )

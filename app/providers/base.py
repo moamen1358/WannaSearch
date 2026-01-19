@@ -23,6 +23,7 @@ class SearchResponse:
     total: int
     duration: float = 0.0
     company_name: Optional[str] = None
+    url: Optional[str] = None
 
 
 class SearchProvider(ABC):
