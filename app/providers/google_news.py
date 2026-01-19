@@ -51,15 +51,49 @@ class GoogleNewsProvider(SearchProvider):
         self.security_keywords = self.search_config.get("security_keywords", DEFAULT_SECURITY_KEYWORDS)
         self.time_range_years = self.search_config.get("time_range_years", 1.5)
 
-    def _build_query(self, query: str, company_name: Optional[str] = None) -> str:
-        """Build the search query with company name and security keywords."""
+    def _build_query(
+        self,
+        query: str,
+        company_name: Optional[str] = None,
+        time_days: Optional[int] = None
+    ) -> str:
+        """Build the search query with company name, query, and time filter."""
+        parts = []
+
+        # Add company name if provided
         if company_name:
-            # Build query: {company_name} AND ("keyword1" OR "keyword2" ...) after:{date}
+            parts.append(company_name)
+
+        # Add custom query or default to security keywords
+        if query:
+            parts.append(query)
+        elif company_name:
+            # Only use security keywords if company is provided but no custom query
             keywords_part = " OR ".join(f'"{kw}"' for kw in self.security_keywords)
+            parts.append(f"({keywords_part})")
+
+        # Build the final query
+        if len(parts) > 1:
+            search_query = " AND ".join(parts)
+        elif parts:
+            search_query = parts[0]
+        else:
+            search_query = query
+
+        # Add time filter
+        if time_days is not None:
+            after_date = datetime.now() - timedelta(days=time_days)
+        elif company_name:
+            # Use default time range for company searches
             after_date = datetime.now() - timedelta(days=int(self.time_range_years * 365))
+        else:
+            after_date = None
+
+        if after_date:
             date_str = after_date.strftime("%Y-%m-%d")
-            return f'{company_name} AND ({keywords_part}) after:{date_str}'
-        return query
+            search_query = f"{search_query} after:{date_str}"
+
+        return search_query
 
     def _build_url(self, query: str) -> str:
         """Build the RSS URL for a query."""
@@ -81,16 +115,22 @@ class GoogleNewsProvider(SearchProvider):
 
         return results
 
-    def search(self, query: str, limit: int = 10, company_name: Optional[str] = None) -> SearchResponse:
+    def search(
+        self,
+        query: str,
+        limit: int = 10,
+        company_name: Optional[str] = None,
+        time_days: Optional[int] = None
+    ) -> SearchResponse:
         """Execute synchronous search."""
         import requests
 
         start = time.time()
-        search_query = self._build_query(query, company_name)
+        search_query = self._build_query(query, company_name, time_days)
         url = self._build_url(search_query)
         headers = {"User-Agent": random.choice(self.user_agents)}
 
-        logger.info(f"Search request: company='{company_name}', query='{search_query[:100]}'")
+        logger.info(f"Search request: company='{company_name}', query='{search_query[:100]}', time_days={time_days}")
 
         try:
             resp = requests.get(url, headers=headers, timeout=30)
@@ -109,14 +149,20 @@ class GoogleNewsProvider(SearchProvider):
             company_name=company_name,
         )
 
-    async def search_async(self, query: str, limit: int = 10, company_name: Optional[str] = None) -> SearchResponse:
+    async def search_async(
+        self,
+        query: str,
+        limit: int = 10,
+        company_name: Optional[str] = None,
+        time_days: Optional[int] = None
+    ) -> SearchResponse:
         """Execute async search."""
         start = time.time()
-        search_query = self._build_query(query, company_name)
+        search_query = self._build_query(query, company_name, time_days)
         url = self._build_url(search_query)
         headers = {"User-Agent": random.choice(self.user_agents)}
 
-        logger.info(f"Async search request: company='{company_name}', query='{search_query[:100]}'")
+        logger.info(f"Async search request: company='{company_name}', query='{search_query[:100]}', time_days={time_days}")
 
         try:
             async with httpx.AsyncClient(timeout=30) as client:

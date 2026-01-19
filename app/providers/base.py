@@ -33,11 +33,23 @@ class SearchProvider(ABC):
     PROVIDER_DESCRIPTION: str = ""
 
     @abstractmethod
-    def search(self, query: str, limit: int = 10, company_name: Optional[str] = None) -> SearchResponse:
+    def search(
+        self,
+        query: str,
+        limit: int = 10,
+        company_name: Optional[str] = None,
+        time_days: Optional[int] = None
+    ) -> SearchResponse:
         """Execute a search query."""
         pass
 
     @abstractmethod
-    async def search_async(self, query: str, limit: int = 10, company_name: Optional[str] = None) -> SearchResponse:
+    async def search_async(
+        self,
+        query: str,
+        limit: int = 10,
+        company_name: Optional[str] = None,
+        time_days: Optional[int] = None
+    ) -> SearchResponse:
         """Execute an async search query."""
         pass
