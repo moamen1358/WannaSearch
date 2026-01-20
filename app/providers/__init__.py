@@ -5,7 +5,6 @@ import logging
 import os
 import re
 from datetime import datetime
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Dict, List, Optional
 

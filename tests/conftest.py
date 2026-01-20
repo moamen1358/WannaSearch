@@ -1,7 +1,6 @@
 """Pytest configuration and fixtures."""
 
 import pytest
-from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 
 from app.providers.base import SearchResult, SearchResponse

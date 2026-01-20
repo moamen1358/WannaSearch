@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
 
-from app.providers.base import SearchResult, SearchResponse, SearchProvider
+from app.providers.base import SearchResult, SearchResponse
 from app.providers.google_news import GoogleNewsProvider
 
 

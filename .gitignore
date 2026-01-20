@@ -50,3 +50,8 @@ config/config.json
 config/proxies.txt
 SCRAPER_EXPLANATION.md
 .cache/
+
+# Coverage
+.coverage
+coverage.xml
+htmlcov/

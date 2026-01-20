@@ -1,10 +1,7 @@
 """Tests for logging functionality."""
 
 import os
-import pytest
 import tempfile
-from unittest.mock import patch
-from datetime import datetime
 
 
 class TestLoggingUtils:

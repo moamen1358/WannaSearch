@@ -1,10 +1,7 @@
 """Tests for the Search API."""
 
-import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
-from fastapi.testclient import TestClient
 
-from app.providers.base import SearchResult, SearchResponse
 
 
 class TestHealthEndpoint:
