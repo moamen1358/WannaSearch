@@ -157,7 +157,7 @@ curl -X POST http://localhost:8001/search \
 python main.py --serve
 
 # Start on a custom port
-python main.py --serve --port 9000
+python main.py --serve --port 8001
 
 # Or use uvicorn directly with auto-reload for development
 uvicorn app.api.search_api:app --host 0.0.0.0 --port 8001 --reload
@@ -177,7 +177,7 @@ python main.py --serve
 curl http://localhost:8001/health
 
 # Test with custom port
-python main.py --serve --port 9000
+python main.py --serve --port 8001
 
 # Test API search (if server is running)
 curl -X POST http://localhost:8001/search \
