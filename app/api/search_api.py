@@ -53,6 +53,28 @@ def check_rate_limit(client_ip: str) -> bool:
 # App Lifecycle
 # =============================================================================
 
+def print_startup_banner(host: str = "0.0.0.0", port: int = 8001):
+    """Print startup banner with useful information."""
+    import sys
+    banner = f"""
+==================================================
+  WannaSearch API v3.0.0
+==================================================
+  Server:    http://{host}:{port}
+  API Docs:  http://localhost:{port}/docs
+  ReDoc:     http://localhost:{port}/redoc
+  Health:    http://localhost:{port}/health
+==================================================
+  Quick test:
+  curl -X POST http://localhost:{port}/search \\
+    -H "Content-Type: application/json" \\
+    -d '{{"query": "technology news", "limit": 5}}'
+==================================================
+"""
+    print(banner, flush=True)
+    sys.stdout.flush()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global cache
@@ -60,6 +82,7 @@ async def lifespan(app: FastAPI):
     cache = TTLCache(maxsize=config.cache_size, ttl=config.cache_ttl)
     providers = list_providers()
     logger.info(f"Providers: {[p['id'] for p in providers]}")
+    print_startup_banner()
     yield
     logger.info("Shutting down...")
 

@@ -137,8 +137,8 @@ jobs:
         context: .
         push: true
         tags: |
-          ${{ secrets.DOCKERHUB_USERNAME }}/wannascrape:latest
-          ${{ secrets.DOCKERHUB_USERNAME }}/wannascrape:${{ github.sha }}
-          ${{ secrets.DOCKERHUB_USERNAME }}/wannascrape:${{ steps.version.outputs.version }}
+          ${{ secrets.DOCKERHUB_USERNAME }}/wannasearch:latest
+          ${{ secrets.DOCKERHUB_USERNAME }}/wannasearch:${{ github.sha }}
+          ${{ secrets.DOCKERHUB_USERNAME }}/wannasearch:${{ steps.version.outputs.version }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
