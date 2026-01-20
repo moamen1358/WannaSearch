@@ -38,7 +38,8 @@ class SearchProvider(ABC):
         query: str,
         limit: int = 10,
         company_name: Optional[str] = None,
-        time_days: Optional[int] = None
+        time_days: Optional[int] = None,
+        country: Optional[str] = None
     ) -> SearchResponse:
         """Execute a search query."""
         pass
@@ -49,7 +50,8 @@ class SearchProvider(ABC):
         query: str,
         limit: int = 10,
         company_name: Optional[str] = None,
-        time_days: Optional[int] = None
+        time_days: Optional[int] = None,
+        country: Optional[str] = None
     ) -> SearchResponse:
         """Execute an async search query."""
         pass

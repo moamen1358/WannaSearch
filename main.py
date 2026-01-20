@@ -24,6 +24,10 @@ def main():
 
     args = parser.parse_args()
 
+    # Validate limit range
+    if args.limit < 1 or args.limit > 100:
+        parser.error("--limit must be between 1 and 100")
+
     if args.serve:
         import uvicorn
         uvicorn.run("app.api.search_api:app", host="0.0.0.0", port=args.port)

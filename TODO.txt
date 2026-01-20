@@ -1,1 +1,0 @@
-i need to make the search looged to logs directory for each search and update hte docker if needed 

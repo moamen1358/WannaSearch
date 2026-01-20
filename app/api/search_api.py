@@ -1,5 +1,6 @@
 """Scalable News Search API."""
 
+import asyncio
 import time
 import logging
 from typing import Optional, List, Dict
@@ -36,11 +37,16 @@ rate_limits: Dict[str, List[float]] = {}
 def check_rate_limit(client_ip: str) -> bool:
     """Check if client is within rate limit."""
     now = time.time()
+
+    if client_ip in rate_limits:
+        # Clean old entries
+        rate_limits[client_ip] = [t for t in rate_limits[client_ip] if now - t < config.rate_window]
+        # Remove empty IP entries to prevent memory leak
+        if not rate_limits[client_ip]:
+            del rate_limits[client_ip]
+
     if client_ip not in rate_limits:
         rate_limits[client_ip] = []
-
-    # Clean old entries
-    rate_limits[client_ip] = [t for t in rate_limits[client_ip] if now - t < config.rate_window]
 
     if len(rate_limits[client_ip]) >= config.rate_limit:
         return False
@@ -201,12 +207,13 @@ async def search(req: SearchRequest, request: Request):
         for r in result.results
     ]
 
-    # Log search results to file
+    # Log search results to file (run in thread pool to avoid blocking)
     log_results = [
         {"title": r.title, "link": r.link, "published": r.published, "source": r.source}
         for r in result.results
     ]
-    log_path = create_search_log(
+    log_path = await asyncio.to_thread(
+        create_search_log,
         company_name=req.company_name,
         results=log_results,
         url=result.url,
