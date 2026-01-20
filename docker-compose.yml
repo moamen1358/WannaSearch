@@ -3,7 +3,7 @@ version: '3.8'
 services:
   search-api:
     build: .
-    image: moamen1358/wannasearch:latest
+    image: moamen1358/wannasearch:2.0.3
     container_name: search-api
     ports:
       - "8001:8001"
