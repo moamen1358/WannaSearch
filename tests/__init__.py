@@ -1,0 +1,1 @@
+"""WannaSearch test suite."""

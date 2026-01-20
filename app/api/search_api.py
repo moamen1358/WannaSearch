@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from cachetools import TTLCache
 
-from app.providers import get_provider, list_providers
+from app.providers import get_provider, list_providers, create_search_log
 
 # Logger (configured by providers module on import)
 logger = logging.getLogger("api")
@@ -177,6 +177,19 @@ async def search(req: SearchRequest, request: Request):
         SearchResult(title=r.title, link=r.link, published=r.published, source=r.source)
         for r in result.results
     ]
+
+    # Log search results to file
+    log_results = [
+        {"title": r.title, "link": r.link, "published": r.published, "source": r.source}
+        for r in result.results
+    ]
+    log_path = create_search_log(
+        company_name=req.company_name,
+        results=log_results,
+        url=result.url,
+        query=result.query
+    )
+    logger.info(f"Search logged to: {log_path}")
 
     # Cache
     if cache is not None:
