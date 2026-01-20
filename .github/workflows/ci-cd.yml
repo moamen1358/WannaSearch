@@ -9,7 +9,7 @@ on:
 
 env:
   REGISTRY: docker.io
-  IMAGE_NAME: moamen1358/news-search
+  IMAGE_NAME: moamen1358/wannasearch
 
 jobs:
   test:
