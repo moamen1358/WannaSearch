@@ -1,30 +1,35 @@
 # WannaSearch
 
-A news search tool that searches Google News RSS feeds with CLI and API interfaces. Features company-focused search, time range filtering, and automatic log saving with Cairo timezone timestamps.
+WannaSearch is a news search tool over Google News RSS, packaged as a
+CLI and a FastAPI HTTP service. It supports company-focused queries,
+time-range filtering, and writes per-company search logs in the Cairo
+timezone for later review.
+
+No API key is required — Google News RSS is the default provider, and
+the provider system is pluggable for future sources.
 
 ## Features
 
-- **Google News RSS Search**: Search news via Google News RSS feeds (no API key required)
-- **Company-Focused Search**: Combine company name with search queries
-- **Time Range Filtering**: Filter results by days (e.g., last 30, 90, 365 days)
-- **Automatic Logging**: Saves search results to `logs/{company}_{timestamp}.log` (Cairo timezone)
-- **REST API**: FastAPI service for programmatic access
-- **Docker Support**: Easy deployment with Docker and docker-compose
+- Google News RSS search (no API key required)
+- Company-focused queries that combine a company name with search terms
+- Time-range filtering by days (e.g., last 30, 90, 365)
+- Automatic per-search log files at `logs/{company}_{timestamp}.log`
+  (Cairo timezone)
+- REST API via FastAPI with response caching
+- Docker and docker-compose support
 
-## Project Structure
+## Project structure
 
 ```
 WannaSearch/
 ├── app/
-│   ├── services/
-│   │   └── news_search.py    # News search service
-│   ├── providers/
-│   │   ├── base.py           # Base provider interface
-│   │   └── google_news.py    # Google News RSS provider
-│   └── api/
-│       └── search_api.py     # FastAPI endpoint
-├── main.py                   # CLI entry point
-├── logs/                     # Search logs (gitignored)
+│   ├── api/
+│   │   └── search_api.py   # FastAPI endpoints
+│   └── providers/
+│       ├── base.py         # SearchProvider abstract interface
+│       └── google_news.py  # Google News RSS implementation
+├── main.py                 # CLI entry point
+├── logs/                   # Per-search logs (gitignored)
 ├── requirements.txt
 ├── Dockerfile
 └── docker-compose.yml
@@ -59,6 +64,8 @@ python main.py -q "cybersecurity news" -t 30 -l 10
 | `-q, --query` | Search query/keywords |
 | `-t, --time` | Time range in days (e.g., 365 for last year) |
 | `-l, --limit` | Max results (default: 10) |
+| `-p, --provider` | Provider ID (default: `google_news_rss`) |
+| `--list-providers` | Print available providers and exit |
 | `--serve` | Start the API server |
 | `--port` | API server port (default: 8001) |
 
@@ -140,15 +147,32 @@ curl -X POST http://localhost:8001/search \
 ### Response Format
 
 ```json
-[
-  {
-    "title": "Article Title",
-    "link": "https://example.com/article",
-    "published": "2026-01-18T10:30:00Z",
-    "source": "Source Name"
-  }
-]
+{
+  "query": "data breach",
+  "company_name": "Microsoft",
+  "provider": "google_news_rss",
+  "results": [
+    {
+      "title": "Article Title",
+      "link": "https://example.com/article",
+      "published": "2026-01-18T10:30:00Z",
+      "source": "Source Name"
+    }
+  ],
+  "total": 1,
+  "duration": 0.42,
+  "cached": false
+}
 ```
+
+### Other endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/health` | Liveness probe |
+| `GET` | `/providers` | List available search providers |
+| `POST` | `/search` | Run a search |
+| `DELETE` | `/cache` | Clear the response cache |
 
 ## Running the API Locally
 
