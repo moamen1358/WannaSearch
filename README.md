@@ -1,5 +1,7 @@
 # WannaSearch
 
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 WannaSearch is a news search tool over Google News RSS, packaged as a
 CLI and a FastAPI HTTP service. It supports company-focused queries,
 time-range filtering, and writes per-company search logs in the Cairo
